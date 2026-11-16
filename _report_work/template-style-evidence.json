@@ -1,0 +1,168 @@
+{
+  "input": "C:\\Users\\MVR TARUN\\Downloads\\Aoop_aq2_Report Format.docx",
+  "fonts_by_char_count": {},
+  "direct_run_formatting_runs": 341,
+  "direct_paragraph_formatting_paragraphs": 334,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 8,
+      "text": "ADHIRAJ PRATAP SINGH (RA2211056010001)",
+      "style": "Normal"
+    },
+    {
+      "para_index": 9,
+      "text": "MUKKAMALLA SUBRAMANYA TRISHANK REDDY (RA2211056010002)",
+      "style": "Normal"
+    },
+    {
+      "para_index": 12,
+      "text": "Under the guidance of \nDr. S.Srividhya \nIn partial fulfilment for the Course",
+      "style": "Normal"
+    },
+    {
+      "para_index": 15,
+      "text": "21CSC206P \u2013 ADVANCED OBJECT ORIENTED AND PROGRAMMING",
+      "style": "Normal"
+    },
+    {
+      "para_index": 18,
+      "text": " Department of Data Science and Business Systems",
+      "style": "Normal"
+    },
+    {
+      "para_index": 23,
+      "text": "FACULTY OF ENGINEERING AND TECHNOLOGY ",
+      "style": "Normal"
+    },
+    {
+      "para_index": 24,
+      "text": "SCHOOL OF COMPUTING ",
+      "style": "Normal"
+    },
+    {
+      "para_index": 25,
+      "text": "SRM INSTITUTE OF SCIENCE AND TECHNOLOGY",
+      "style": "Normal"
+    },
+    {
+      "para_index": 26,
+      "text": "KATTANKULATHUR",
+      "style": "Normal"
+    },
+    {
+      "para_index": 28,
+      "text": "NOVEMBER  2026",
+      "style": "Normal"
+    },
+    {
+      "para_index": 29,
+      "text": "SRM INSTITUTE OF SCIENCE AND TECHNOLOGY",
+      "style": "Normal"
+    },
+    {
+      "para_index": 31,
+      "text": "(Under Section 3 of UGC Act, 1956)",
+      "style": "Normal"
+    },
+    {
+      "para_index": 33,
+      "text": "BONAFIDE CERTIFICATE",
+      "style": "Normal"
+    },
+    {
+      "para_index": 78,
+      "text": "TABLE OF CONTENTS",
+      "style": "Normal"
+    },
+    {
+      "para_index": 98,
+      "text": "INTRODUCTION",
+      "style": "List Paragraph"
+    },
+    {
+      "para_index": 127,
+      "text": "LITERATURE SURVEY ",
+      "style": "List Paragraph"
+    },
+    {
+      "para_index": 162,
+      "text": "REQUIREMENTS ",
+      "style": "List Paragraph"
+    },
+    {
+      "para_index": 164,
+      "text": " Requirement Analysis",
+      "style": "List Paragraph"
+    },
+    {
+      "para_index": 176,
+      "text": "Hardware Requirement",
+      "style": "List Paragraph"
+    },
+    {
+      "para_index": 229,
+      "text": "ARCHITECTURE AND DESIGN",
+      "style": "List Paragraph"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "SMALL BUSINESS NETWORK DESIGN WITH SECURE E-COMMERCE SERVER",
+        "style": "Heading 1"
+      },
+      {
+        "para_index": 2,
+        "text": "",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 3,
+        "text": "MINOR PROJECT REPORT",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "text": "",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 5,
+        "text": "By",
+        "style": "Normal"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "SMALL BUSINESS NETWORK DESIGN WITH SECURE E-COMMERCE SERVER",
+        "style": "Heading 1"
+      },
+      {
+        "para_index": 3,
+        "run_text": "MINOR",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": " PROJECT REPORT",
+        "style": "Normal"
+      },
+      {
+        "para_index": 5,
+        "run_text": "By",
+        "style": "Normal"
+      },
+      {
+        "para_index": 8,
+        "run_text": "ADHIRAJ PRATAP SINGH",
+        "style": "Normal"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

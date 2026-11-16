@@ -1,0 +1,1 @@
+public class TestRent { public static void main(String[] args) { FleetDAO dao = new FleetDAO(); boolean result = dao.rentVehicle(9, 1, 10000000, 500000000.0); System.out.println("Result: " + result); } }

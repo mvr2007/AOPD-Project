@@ -1,299 +1,151 @@
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.JTableHeader;
+import javax.swing.table.*;
+import javax.swing.RowFilter;
 import java.awt.*;
+import java.awt.event.*;
+import java.io.File;
+import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
+/** FleetHub desktop console.  All data changes are delegated to FleetDAO. */
 public class MainAppFrame extends JFrame {
-    private FleetDAO fleetDAO;
-    private JTabbedPane tabbedPane;
-    private JTable inventoryTable;
-    private JTable rentTable;
-    private JTable activeRentalsTable;
-    private JLabel revenueLabel;
+    private final FleetDAO dao = new FleetDAO();
+    private final String username, role;
+    private final CardLayout cards = new CardLayout();
+    private JPanel viewHost;
+    private JLabel pageTitle, fleetKpi, availableKpi, leasesKpi, revenueKpi, dbPill;
+    private JTable inventoryTable, availableTable, activeTable, customerTable, historyTable, auditTable;
+    private TableRowSorter<DefaultTableModel> inventorySorter;
+    private JTextField searchField;
+    private String activeView = "Fleet Inventory";
+    private static final String[] VIEWS = {"Fleet Inventory", "Rent a Vehicle", "Active & Overdue Rentals", "Customers & History", "Business Analytics", "System Audit Log"};
+    private static final NumberFormat MONEY = NumberFormat.getCurrencyInstance();
 
-    public MainAppFrame() {
-        fleetDAO = new FleetDAO();
-        
-        setTitle("FleetWise Hub: Smart Vehicle Rental & Fleet Management System");
-        setSize(900, 600);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
+    public MainAppFrame() { this("admin", "ADMIN"); }
+    public MainAppFrame(String username, String role) {
+        this.username = username == null ? "admin" : username;
+        this.role = role == null ? "ADMIN" : role.toUpperCase(Locale.ROOT);
+        setTitle("FleetHub · Fleet Lifecycle Console"); setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setMinimumSize(new Dimension(1120, 720)); setSize(1380, 860); setLocationRelativeTo(null);
         getContentPane().setBackground(CozyTheme.WARM_CREAM);
-        
-        UIManager.put("TabbedPane.background", CozyTheme.WARM_CREAM);
-        UIManager.put("TabbedPane.foreground", CozyTheme.DARK_SLATE);
-        UIManager.put("TabbedPane.selected", CozyTheme.SEC_PANEL);
-        UIManager.put("Panel.background", CozyTheme.WARM_CREAM);
-        
-        initUI();
-    }
-    
-    private void initUI() {
-        tabbedPane = new JTabbedPane();
-        tabbedPane.setFont(CozyTheme.HEADER_FONT);
-        
-        tabbedPane.addTab("Fleet Inventory", createInventoryPanel());
-        tabbedPane.addTab("Rent Vehicle", createRentPanel());
-        tabbedPane.addTab("Active Rentals", createActiveRentalsPanel());
-        tabbedPane.addTab("Analytics/Billing", createAnalyticsPanel());
-        
-        add(tabbedPane, BorderLayout.CENTER);
-    }
-    
-    private void styleTable(JTable table) {
-        table.setFont(CozyTheme.MAIN_FONT);
-        table.setRowHeight(30);
-        table.setBackground(Color.WHITE);
-        table.setForeground(CozyTheme.DARK_SLATE);
-        table.setSelectionBackground(CozyTheme.SAGE_GREEN);
-        table.setSelectionForeground(Color.WHITE);
-        table.setIntercellSpacing(new Dimension(0, 0));
-        table.setShowGrid(false);
-        table.setShowHorizontalLines(true);
-        table.setGridColor(CozyTheme.SEC_PANEL);
-        
-        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
-        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
-        for(int x=0; x<table.getColumnCount(); x++){
-            table.getColumnModel().getColumn(x).setCellRenderer(centerRenderer);
-        }
-
-        JTableHeader header = table.getTableHeader();
-        header.setBackground(CozyTheme.SAGE_GREEN);
-        header.setForeground(Color.WHITE);
-        header.setFont(CozyTheme.HEADER_FONT);
-        header.setOpaque(false);
-    }
-    
-    private JPanel createInventoryPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        
-        inventoryTable = new JTable(fleetDAO.getAllVehicles());
-        styleTable(inventoryTable);
-        JScrollPane scrollPane = new JScrollPane(inventoryTable);
-        scrollPane.getViewport().setBackground(CozyTheme.WARM_CREAM);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        actionPanel.setBackground(CozyTheme.SEC_PANEL);
-        JButton btnAdd = new JButton("Add Vehicle");
-        styleButton(btnAdd, CozyTheme.SAGE_GREEN);
-        btnAdd.addActionListener(e -> showAddVehicleModal());
-        JButton btnRefresh = new JButton("Refresh");
-        styleButton(btnRefresh, CozyTheme.TERRACOTTA);
-        btnRefresh.addActionListener(e -> refreshTables());
-        
-        actionPanel.add(btnAdd);
-        actionPanel.add(btnRefresh);
-        panel.add(actionPanel, BorderLayout.SOUTH);
-        
-        return panel;
-    }
-    
-    private JPanel createRentPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        
-        rentTable = new JTable(fleetDAO.getAvailableVehicles());
-        styleTable(rentTable);
-        JScrollPane scrollPane = new JScrollPane(rentTable);
-        scrollPane.getViewport().setBackground(CozyTheme.WARM_CREAM);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        actionPanel.setBackground(CozyTheme.SEC_PANEL);
-        JButton btnRent = new JButton("Rent Selected Vehicle");
-        styleButton(btnRent, CozyTheme.SAGE_GREEN);
-        btnRent.addActionListener(e -> showRentModal());
-        
-        actionPanel.add(btnRent);
-        panel.add(actionPanel, BorderLayout.SOUTH);
-        
-        return panel;
-    }
-    
-    private JPanel createActiveRentalsPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        
-        activeRentalsTable = new JTable(fleetDAO.getActiveRentals());
-        styleTable(activeRentalsTable);
-        JScrollPane scrollPane = new JScrollPane(activeRentalsTable);
-        scrollPane.getViewport().setBackground(CozyTheme.WARM_CREAM);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        actionPanel.setBackground(CozyTheme.SEC_PANEL);
-        JButton btnReturn = new JButton("Return Vehicle");
-        styleButton(btnReturn, CozyTheme.TERRACOTTA);
-        btnReturn.addActionListener(e -> processReturn());
-        
-        actionPanel.add(btnReturn);
-        panel.add(actionPanel, BorderLayout.SOUTH);
-        
-        return panel;
-    }
-    
-    private JPanel createAnalyticsPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBackground(CozyTheme.WARM_CREAM);
-        
-        revenueLabel = new JLabel("Total Revenue: $" + fleetDAO.calculateTotalRevenue());
-        revenueLabel.setFont(CozyTheme.TITLE_FONT);
-        revenueLabel.setForeground(CozyTheme.DARK_SLATE);
-        
-        JButton refreshBtn = new JButton("Update Analytics");
-        styleButton(refreshBtn, CozyTheme.SAGE_GREEN);
-        refreshBtn.addActionListener(e -> {
-            revenueLabel.setText("Total Revenue: $" + fleetDAO.calculateTotalRevenue());
-        });
-        
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridx = 0; gbc.gridy = 0; gbc.insets = new Insets(10,10,20,10);
-        panel.add(revenueLabel, gbc);
-        gbc.gridy = 1;
-        panel.add(refreshBtn, gbc);
-        
-        return panel;
-    }
-    
-    private void styleButton(JButton btn, Color bgColor) {
-        btn.setBackground(bgColor);
-        btn.setForeground(Color.WHITE);
-        btn.setFont(CozyTheme.HEADER_FONT);
-        btn.setFocusPainted(false);
-        btn.setBorder(new EmptyBorder(8, 15, 8, 15));
-        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-    }
-    
-    private void showAddVehicleModal() {
-        JDialog dialog = new JDialog(this, "Add New Vehicle", true);
-        dialog.setSize(400, 300);
-        dialog.setLocationRelativeTo(this);
-        
-        JPanel panel = new JPanel(new GridLayout(6, 2, 10, 10));
-        panel.setBorder(new EmptyBorder(15, 15, 15, 15));
-        panel.setBackground(CozyTheme.WARM_CREAM);
-        
-        JTextField tfModel = new JTextField();
-        JTextField tfCat = new JTextField();
-        JTextField tfRate = new JTextField();
-        JComboBox<String> cbStatus = new JComboBox<>(new String[]{"Available", "Maintenance"});
-        JTextField tfFuel = new JTextField();
-        
-        panel.add(new JLabel("Model Name:")); panel.add(tfModel);
-        panel.add(new JLabel("Category:")); panel.add(tfCat);
-        panel.add(new JLabel("Daily Rate:")); panel.add(tfRate);
-        panel.add(new JLabel("Status:")); panel.add(cbStatus);
-        panel.add(new JLabel("Fuel Type:")); panel.add(tfFuel);
-        
-        JButton btnSave = new JButton("Save");
-        styleButton(btnSave, CozyTheme.SAGE_GREEN);
-        btnSave.addActionListener(e -> {
-            try {
-                double rate = Double.parseDouble(tfRate.getText());
-                if(fleetDAO.addVehicle(tfModel.getText(), tfCat.getText(), rate, (String)cbStatus.getSelectedItem(), tfFuel.getText())) {
-                    JOptionPane.showMessageDialog(dialog, "Vehicle added successfully!");
-                    refreshTables();
-                    dialog.dispose();
-                } else {
-                    JOptionPane.showMessageDialog(dialog, "Failed to add vehicle.", "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            } catch(NumberFormatException ex) {
-                JOptionPane.showMessageDialog(dialog, "Invalid Daily Rate.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-        
-        panel.add(new JLabel()); panel.add(btnSave);
-        dialog.add(panel);
-        dialog.setVisible(true);
-    }
-    
-    private void showRentModal() {
-        int row = rentTable.getSelectedRow();
-        if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Please select an available vehicle to rent.");
-            return;
-        }
-        
-        int vehicleId = (int) rentTable.getValueAt(row, 0);
-        double rate = (double) rentTable.getValueAt(row, 3);
-        
-        JDialog dialog = new JDialog(this, "Rent Vehicle", true);
-        dialog.setSize(300, 250);
-        dialog.setLocationRelativeTo(this);
-        
-        JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
-        panel.setBorder(new EmptyBorder(15, 15, 15, 15));
-        panel.setBackground(CozyTheme.WARM_CREAM);
-        
-        JTextField tfCustomer = new JTextField("1");
-        JTextField tfDays = new JTextField();
-        
-        panel.add(new JLabel("Customer ID:")); panel.add(tfCustomer);
-        panel.add(new JLabel("Rental Days:")); panel.add(tfDays);
-        
-        JButton btnProcess = new JButton("Process Rental");
-        styleButton(btnProcess, CozyTheme.SAGE_GREEN);
-        btnProcess.addActionListener(e -> {
-            try {
-                int cid = Integer.parseInt(tfCustomer.getText());
-                int days = Integer.parseInt(tfDays.getText());
-                double total = rate * days;
-                if(fleetDAO.rentVehicle(vehicleId, cid, days, total)) {
-                    JOptionPane.showMessageDialog(dialog, "Rental successful! Total: $" + total);
-                    refreshTables();
-                    dialog.dispose();
-                } else {
-                    JOptionPane.showMessageDialog(dialog, "Rental failed.", "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dialog, "Invalid Input.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-        
-        panel.add(new JLabel()); panel.add(btnProcess);
-        dialog.add(panel);
-        dialog.setVisible(true);
-    }
-    
-    private void processReturn() {
-        int row = activeRentalsTable.getSelectedRow();
-        if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Please select an active rental to return.");
-            return;
-        }
-        
-        int rentalId = (int) activeRentalsTable.getValueAt(row, 0);
-        int vehicleId = (int) activeRentalsTable.getValueAt(row, 1);
-        
-        if (fleetDAO.returnVehicle(rentalId, vehicleId)) {
-            JOptionPane.showMessageDialog(this, "Vehicle returned successfully!");
-            refreshTables();
-            revenueLabel.setText("Total Revenue: $" + fleetDAO.calculateTotalRevenue());
-        } else {
-            JOptionPane.showMessageDialog(this, "Failed to return vehicle.", "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-    
-    private void refreshTables() {
-        inventoryTable.setModel(fleetDAO.getAllVehicles());
-        rentTable.setModel(fleetDAO.getAvailableVehicles());
-        activeRentalsTable.setModel(fleetDAO.getActiveRentals());
-        styleTable(inventoryTable);
-        styleTable(rentTable);
-        styleTable(activeRentalsTable);
+        setLayout(new BorderLayout());
+        add(buildSidebar(), BorderLayout.WEST);
+        JPanel main = new JPanel(new BorderLayout(0, 18)); main.setOpaque(true); main.setBackground(CozyTheme.WARM_CREAM);
+        main.setBorder(new EmptyBorder(26, 30, 24, 30));
+        main.add(buildHeader(), BorderLayout.NORTH);
+        viewHost = new JPanel(cards); viewHost.setOpaque(false);
+        for (int i=0;i<VIEWS.length;i++) viewHost.add(buildView(i), VIEWS[i]);
+        main.add(viewHost, BorderLayout.CENTER); add(main, BorderLayout.CENTER);
+        installShortcuts(); refreshAll(); showView(VIEWS[0]);
     }
 
-    public static void main(String[] args) {
-        try {
-            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
-        } catch (Exception e) {}
-        
-        SwingUtilities.invokeLater(() -> {
-            new MainAppFrame().setVisible(true);
-        });
+    private JPanel buildSidebar() {
+        JPanel side = new JPanel(new BorderLayout()); side.setPreferredSize(new Dimension(230, 0)); side.setBackground(CozyTheme.DARK_SLATE);
+        JPanel brand = new JPanel(new BorderLayout(12, 0)); brand.setOpaque(false); brand.setBorder(new EmptyBorder(28,20,28,16));
+        brand.add(new BrandMark(), BorderLayout.WEST);
+        JPanel labels = new JPanel(); labels.setOpaque(false); labels.setLayout(new BoxLayout(labels, BoxLayout.Y_AXIS));
+        JLabel name = new JLabel("FleetHub"); name.setForeground(Color.WHITE); name.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        JLabel sub = new JLabel("Fleet Lifecycle Console"); sub.setForeground(new Color(190,202,192)); sub.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        labels.add(name); labels.add(Box.createVerticalStrut(4)); labels.add(sub); brand.add(labels, BorderLayout.CENTER); side.add(brand, BorderLayout.NORTH);
+        JPanel nav = new JPanel(); nav.setOpaque(false); nav.setLayout(new BoxLayout(nav, BoxLayout.Y_AXIS)); nav.setBorder(new EmptyBorder(12,12,0,12));
+        String[] glyphs={"▦","↗","◷","♙","◉","≡"};
+        for(int i=0;i<VIEWS.length;i++) { final String view=VIEWS[i]; JButton b=new NavButton(glyphs[i],view); b.addActionListener(e->showView(view)); nav.add(b); nav.add(Box.createVerticalStrut(6)); }
+        side.add(nav, BorderLayout.CENTER);
+        JPanel profile = new JPanel(new BorderLayout(8,7)); profile.setOpaque(true); profile.setBackground(new Color(255,255,255,18)); profile.setBorder(new EmptyBorder(14,14,16,14));
+        JLabel user = new JLabel("●  "+this.username); user.setForeground(Color.WHITE); user.setFont(new Font("Segoe UI",Font.BOLD,14));
+        JLabel badge=new JLabel("  "+this.role+"  "); badge.setOpaque(true); badge.setBackground(this.role.equals("ADMIN")?CozyTheme.SAGE_GREEN:new Color(76,126,97)); badge.setForeground(Color.WHITE); badge.setFont(new Font("Segoe UI",Font.BOLD,10));
+        JButton logout=new ModernComponents.ModernButton("Logout",new Color(77,88,81),Color.WHITE); logout.addActionListener(e->{dispose(); SwingUtilities.invokeLater(()->{LoginDialog d=new LoginDialog(null); d.setVisible(true); if(d.loggedInUser!=null)new MainAppFrame(d.loggedInUser,d.loggedInRole).setVisible(true);});});
+        JPanel row=new JPanel(new FlowLayout(FlowLayout.LEFT,0,0)); row.setOpaque(false); row.add(badge);
+        profile.add(user,BorderLayout.NORTH); profile.add(row,BorderLayout.CENTER); profile.add(logout,BorderLayout.SOUTH);
+        JPanel wrap=new JPanel(new BorderLayout()); wrap.setOpaque(false); wrap.setBorder(new EmptyBorder(12,12,14,12)); wrap.add(profile); side.add(wrap,BorderLayout.SOUTH); return side;
     }
+
+    private JPanel buildHeader() {
+        JPanel box=new JPanel(new BorderLayout(10,16)); box.setOpaque(false);
+        JPanel top=new JPanel(new BorderLayout()); top.setOpaque(false);
+        JPanel titleBox=new JPanel(); titleBox.setOpaque(false); titleBox.setLayout(new BoxLayout(titleBox,BoxLayout.Y_AXIS));
+        pageTitle=new JLabel(activeView); pageTitle.setFont(new Font("Segoe UI",Font.BOLD,28)); pageTitle.setForeground(CozyTheme.DARK_SLATE);
+        JLabel subtitle=new JLabel("A clear view of your fleet, rentals and daily operations"); subtitle.setFont(CozyTheme.MAIN_FONT); subtitle.setForeground(new Color(112,119,111)); titleBox.add(pageTitle); titleBox.add(Box.createVerticalStrut(4)); titleBox.add(subtitle); top.add(titleBox,BorderLayout.WEST);
+        dbPill=new JLabel("● MySQL Connected  •  ACID Ready"); dbPill.setOpaque(true); dbPill.setBackground(new Color(232,241,228)); dbPill.setForeground(new Color(46,104,56)); dbPill.setFont(new Font("Segoe UI",Font.BOLD,12)); dbPill.setBorder(new EmptyBorder(9,13,9,13)); top.add(dbPill,BorderLayout.EAST); box.add(top,BorderLayout.NORTH);
+        JPanel kpis=new JPanel(new GridLayout(1,4,14,0)); kpis.setOpaque(false);
+        fleetKpi=kpi(kpis,"TOTAL FLEET","—",CozyTheme.SAGE_GREEN,"▦"); availableKpi=kpi(kpis,"AVAILABLE NOW","—",new Color(46,125,50),"✓"); leasesKpi=kpi(kpis,"ACTIVE LEASES","—",CozyTheme.TERRACOTTA,"↗"); revenueKpi=kpi(kpis,"TOTAL REVENUE","—",CozyTheme.DARK_SLATE,"$" );
+        box.add(kpis,BorderLayout.CENTER); return box;
+    }
+    private JLabel kpi(JPanel parent,String label,String value,Color accent,String icon){
+        ModernComponents.RoundedPanel card=new ModernComponents.RoundedPanel(15,Color.WHITE); card.setLayout(new BorderLayout(10,0)); card.setBorder(new EmptyBorder(17,18,17,16));
+        JPanel accentBar=new JPanel(); accentBar.setBackground(accent); accentBar.setPreferredSize(new Dimension(4,50)); card.add(accentBar,BorderLayout.WEST);
+        JPanel copy=new JPanel(); copy.setOpaque(false); copy.setLayout(new BoxLayout(copy,BoxLayout.Y_AXIS)); JLabel cap=new JLabel(label); cap.setForeground(new Color(114,120,113)); cap.setFont(new Font("Segoe UI",Font.BOLD,10)); JLabel val=new JLabel(value); val.setForeground(CozyTheme.DARK_SLATE); val.setFont(new Font("Segoe UI",Font.BOLD,24)); copy.add(cap);copy.add(Box.createVerticalStrut(6));copy.add(val); card.add(copy,BorderLayout.CENTER);
+        JLabel glyph=new JLabel(icon); glyph.setForeground(accent); glyph.setFont(new Font("Segoe UI",Font.BOLD,19)); card.add(glyph,BorderLayout.EAST); parent.add(card); return val;
+    }
+
+    private JPanel buildView(int i){ switch(i){case 0:return inventoryView();case 1:return rentView();case 2:return activeView();case 3:return customersView();case 4:return analyticsView();default:return auditView();} }
+    private JPanel inventoryView(){
+        JPanel p=page(); JPanel tools=toolbar(); searchField=new JTextField(); searchField.setFont(CozyTheme.MAIN_FONT); searchField.setToolTipText("Search inventory · Ctrl+F"); searchField.setPreferredSize(new Dimension(230,38)); searchField.putClientProperty("JTextField.placeholderText","Search vehicles");
+        inventoryTable=table(dao.getAllVehicles()); inventorySorter=new TableRowSorter<>((DefaultTableModel)inventoryTable.getModel()); inventoryTable.setRowSorter(inventorySorter);
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){filter();}public void removeUpdate(javax.swing.event.DocumentEvent e){filter();}public void changedUpdate(javax.swing.event.DocumentEvent e){filter();}void filter(){String q=searchField.getText().trim();inventorySorter.setRowFilter(q.isEmpty()?null:RowFilter.regexFilter("(?i)"+java.util.regex.Pattern.quote(q)));}});
+        tools.add(searchField); JComboBox<String> status=new JComboBox<>(new String[]{"All statuses","Available","Rented","Maintenance","Service Due","Low Fuel"}); tools.add(status); status.addActionListener(e->{String s=(String)status.getSelectedItem();inventorySorter.setRowFilter("All statuses".equals(s)?null:RowFilter.regexFilter("^"+java.util.regex.Pattern.quote(s)+"$",4));});
+        JButton add=button("+ Add Vehicle",CozyTheme.SAGE_GREEN); add.addActionListener(e->addVehicle());tools.add(add);
+        JButton maintenance=button("Toggle Maintenance",CozyTheme.DARK_SLATE);maintenance.addActionListener(e->toggleMaintenance());tools.add(maintenance);
+        JButton service=button("Log Service",new Color(190,137,43));service.addActionListener(e->logService());tools.add(service);
+        JButton refuel=button("Refuel (100%)",new Color(0xC2,0x41,0x0C));refuel.addActionListener(e->refuelVehicle());tools.add(refuel);
+        if(isAdmin()){JButton rate=button("Edit Rate",CozyTheme.TERRACOTTA);rate.addActionListener(e->editRate());tools.add(rate);}
+        p.add(tools,BorderLayout.NORTH);p.add(tableCard(inventoryTable),BorderLayout.CENTER);return p;
+    }
+    private JPanel rentView(){
+        JPanel p=page(); JPanel body=new JPanel(new GridLayout(1,2,18,0));body.setOpaque(false);
+        ModernComponents.RoundedPanel form=card(); form.setLayout(new GridBagLayout());GridBagConstraints c=gc();int y=0;
+        addLabel(form,c,y++,"Customer"); JComboBox<CustomerChoice> cust=new JComboBox<>(); DefaultTableModel cm=dao.getAllCustomers();for(int i=0;i<cm.getRowCount();i++)cust.addItem(new CustomerChoice((Integer)cm.getValueAt(i,0),String.valueOf(cm.getValueAt(i,1))));addAt(form,c,cust,y++);
+        addLabel(form,c,y++,"Available vehicle");JComboBox<VehicleChoice> veh=new JComboBox<>();DefaultTableModel vm=dao.getAvailableVehicles();for(int i=0;i<vm.getRowCount();i++)veh.addItem(new VehicleChoice((Integer)vm.getValueAt(i,0),String.valueOf(vm.getValueAt(i,1)),((Number)vm.getValueAt(i,3)).doubleValue(),((Number)vm.getValueAt(i,6)).intValue()));addAt(form,c,veh,y++);
+        addLabel(form,c,y++,"Rental days");JSpinner days=new JSpinner(new SpinnerNumberModel(1,1,365,1));addAt(form,c,days,y++);
+        addLabel(form,c,y++,"Promo code (optional)");JTextField promo=new JTextField();promo.setPreferredSize(new Dimension(250,38));addAt(form,c,promo,y++);
+        JLabel summary=new JLabel("Select a vehicle to see your estimate");summary.setFont(new Font("Segoe UI",Font.BOLD,17));summary.setForeground(CozyTheme.DARK_SLATE);addAt(form,c,summary,y++);
+        JLabel expected=new JLabel("Expected return: —");addAt(form,c,expected,y++);
+        Runnable update=()->{VehicleChoice v=(VehicleChoice)veh.getSelectedItem();if(v==null)return;int d=(Integer)days.getValue();double disc=discount(promo.getText(),v.rate*d);double tax=(v.rate*d-disc)*.18;summary.setText("Final total  "+MONEY.format(v.rate*d-disc+tax));expected.setText("Expected return: "+new SimpleDateFormat("EEE, dd MMM yyyy").format(new Date(System.currentTimeMillis()+d*86400000L)));};
+        veh.addActionListener(e->update.run());days.addChangeListener(e->update.run());promo.addActionListener(e->update.run());promo.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){update.run();}public void removeUpdate(javax.swing.event.DocumentEvent e){update.run();}public void changedUpdate(javax.swing.event.DocumentEvent e){update.run();}});update.run();
+        JButton book=button("Confirm Booking",CozyTheme.SAGE_GREEN);book.addActionListener(e->{CustomerChoice cu=(CustomerChoice)cust.getSelectedItem();VehicleChoice v=(VehicleChoice)veh.getSelectedItem();if(cu==null||v==null){toast("Add a customer and available vehicle first",false);return;}int d=(Integer)days.getValue();double base=v.rate*d,disc=discount(promo.getText(),base),tax=(base-disc)*.18,total=base-disc+tax;Date end=new Date(System.currentTimeMillis()+d*86400000L);if(dao.bookVehicle(v.id,cu.id,d,total,disc,tax,v.odo,end)){dao.logActivity(username,role,"BOOKING","Vehicle "+v.model+" booked for "+cu.name);toast("Booking confirmed · "+MONEY.format(total),true);new ReceiptDialog(this,"Booking receipt",receipt("Vehicle",v.model,"Customer",cu.name,"Rental days",String.valueOf(d),"Base subtotal",MONEY.format(base),"Promo discount",MONEY.format(disc),"18% GST",MONEY.format(tax),"Final total",MONEY.format(total)),total,false).setVisible(true);refreshAll();}else toast("Booking failed: "+dao.getLastError(),false);});addAt(form,c,book,y++);
+        ModernComponents.RoundedPanel preview=card();preview.setLayout(new BorderLayout(0,15));JLabel h=new JLabel("Available fleet");h.setFont(CozyTheme.TITLE_FONT);preview.add(h,BorderLayout.NORTH);availableTable=table(dao.getAvailableVehicles());preview.add(new JScrollPane(availableTable));body.add(form);body.add(preview);p.add(body);return p;
+    }
+    private JPanel activeView(){JPanel p=page();activeTable=table(dao.getActiveRentals());JPanel t=toolbar();JButton dispatch=button("Dispatch Roadside Fuel",new Color(0xC2,0x41,0x0C));dispatch.addActionListener(e->dispatchRoadsideFuel());t.add(dispatch);JButton ret=button("Process Return",CozyTheme.TERRACOTTA);ret.addActionListener(e->processReturn());t.add(ret);JButton refresh=button("Refresh",CozyTheme.DARK_SLATE);refresh.addActionListener(e->refreshAll());t.add(refresh);p.add(t,BorderLayout.NORTH);p.add(tableCard(activeTable));return p;}
+    private JPanel customersView(){JPanel p=page();JPanel split=new JPanel(new GridLayout(2,1,0,12));split.setOpaque(false);customerTable=table(dao.getAllCustomers());historyTable=table(new DefaultTableModel(new String[]{"Rental ID","Vehicle","Days","Total","Late Fee","Status","Date"},0));customerTable.getSelectionModel().addListSelectionListener(e->{if(!e.getValueIsAdjusting()&&customerTable.getSelectedRow()>=0){int row=customerTable.convertRowIndexToModel(customerTable.getSelectedRow());int id=((Number)customerTable.getModel().getValueAt(row,0)).intValue();historyTable.setModel(dao.getCustomerRentalHistory(id));styleTable(historyTable);}});JPanel top=tableCard(customerTable);JPanel bottom=tableCard(historyTable);JPanel actions=toolbar();JButton add=button("+ Add Customer",CozyTheme.SAGE_GREEN);add.addActionListener(e->addCustomer());actions.add(add);top.add(actions,BorderLayout.NORTH);split.add(top);split.add(bottom);p.add(split);return p;}
+    private JPanel analyticsView(){JPanel p=page();JPanel actions=toolbar();JButton export=button("Export CSV Report",CozyTheme.SAGE_GREEN);export.addActionListener(e->{JFileChooser fc=new JFileChooser();fc.setSelectedFile(new File("fleethub-rentals.csv"));if(fc.showSaveDialog(this)==JFileChooser.APPROVE_OPTION){if(dao.exportRentalsToCSV(fc.getSelectedFile()))toast("CSV report exported",true);else toast("Export failed: "+dao.getLastError(),false);}});actions.add(export);p.add(actions,BorderLayout.NORTH);JPanel charts=new JPanel(new GridLayout(1,2,18,0));charts.setOpaque(false);charts.add(tableCard(new ChartPanel(dao.getRevenueByCategory())));charts.add(tableCard(new DonutPanel(dao.getTotalFleetCount(),dao.getAvailableCount(),dao.getActiveRentalCount())));p.add(charts);return p;}
+    private JPanel auditView(){JPanel p=page();JPanel t=toolbar();JButton refresh=button("Refresh  ·  F5",CozyTheme.DARK_SLATE);refresh.addActionListener(e->refreshAudit());t.add(refresh);p.add(t,BorderLayout.NORTH);auditTable=table(dao.getRecentLogs());p.add(tableCard(auditTable));return p;}
+
+    private void addVehicle(){JTextField model=new JTextField(),cat=new JTextField(),rate=new JTextField(),fuel=new JTextField();JComboBox<String> status=new JComboBox<>(new String[]{"Available","Maintenance"});JPanel f=dialogForm(new String[]{"Model","Category","Daily rate","Fuel type","Status"},new JComponent[]{model,cat,rate,fuel,status});if(JOptionPane.showConfirmDialog(this,f,"Add vehicle",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION)try{if(dao.addVehicle(model.getText().trim(),cat.getText().trim(),Double.parseDouble(rate.getText()),(String)status.getSelectedItem(),fuel.getText().trim())){dao.logActivity(username,role,"VEHICLE_ADDED",model.getText());toast("Vehicle added",true);refreshAll();}else toast("Could not add vehicle: "+dao.getLastError(),false);}catch(Exception ex){toast("Enter a valid positive daily rate",false);}}
+    private void addCustomer(){JTextField name=new JTextField(),phone=new JTextField(),lic=new JTextField();JPanel f=dialogForm(new String[]{"Full name","Phone","License number"},new JComponent[]{name,phone,lic});if(JOptionPane.showConfirmDialog(this,f,"Add customer",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION){if(dao.addCustomer(name.getText().trim(),phone.getText().trim(),lic.getText().trim())){dao.logActivity(username,role,"CUSTOMER_ADDED",name.getText());toast("Customer added",true);refreshAll();}else toast("Could not add customer: "+dao.getLastError(),false);}}
+    private void toggleMaintenance(){int id=selectedId(inventoryTable);if(id<0)return;int r=inventoryTable.convertRowIndexToModel(inventoryTable.getSelectedRow());String s=String.valueOf(inventoryTable.getModel().getValueAt(r,4));if("Rented".equalsIgnoreCase(s)){toast("A rented vehicle cannot enter maintenance",false);return;}if("Service Due".equalsIgnoreCase(s)){toast("Log the required service before making this vehicle available",false);return;}String next=s.equals("Maintenance")?"Available":"Maintenance";if(dao.updateVehicleStatus(id,next)){dao.logActivity(username,role,"VEHICLE_STATUS",id+" → "+next);toast("Vehicle status updated",true);refreshAll();}else toast("Update failed",false);}
+    private void logService(){int id=selectedId(inventoryTable);if(id<0)return;int r=inventoryTable.convertRowIndexToModel(inventoryTable.getSelectedRow());if("Rented".equalsIgnoreCase(String.valueOf(inventoryTable.getModel().getValueAt(r,4)))){toast("A rented vehicle cannot be serviced",false);return;}if(dao.recordVehicleService(id)){dao.logActivity(username,role,"SERVICE_RECORDED","Vehicle "+id);toast("Service recorded · vehicle available",true);refreshAll();}else toast("Service update failed",false);}
+    private void editRate(){int id=selectedId(inventoryTable);if(id<0)return;String s=JOptionPane.showInputDialog(this,"New daily rate");if(s==null)return;try{double rate=Double.parseDouble(s);if(rate>0&&dao.updateVehicleDailyRate(id,rate)){dao.logActivity(username,role,"RATE_UPDATED","Vehicle "+id+" → "+MONEY.format(rate));toast("Daily rate updated",true);refreshAll();}else toast("Rate update failed",false);}catch(Exception e){toast("Enter a valid rate",false);}}
+    private void processReturn(){int row=activeTable.getSelectedRow();if(row<0){toast("Select an active rental first",false);return;}int m=activeTable.convertRowIndexToModel(row);int rental=((Number)activeTable.getModel().getValueAt(m,0)).intValue();String model=String.valueOf(activeTable.getModel().getValueAt(m,1));int startFuel=((Number)activeTable.getModel().getValueAt(m,8)).intValue();JSpinner odo=new JSpinner(new SpinnerNumberModel(0,0,2000000,100));JSpinner fuel=new JSpinner(new SpinnerNumberModel(100,0,100,1));JPanel f=dialogForm(new String[]{"End odometer (km)","End fuel (%) · started at "+startFuel+"%"},new JComponent[]{odo,fuel});if(JOptionPane.showConfirmDialog(this,f,"Return · "+model,JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;int end=(Integer)odo.getValue(),endFuel=(Integer)fuel.getValue();if(dao.returnVehicleWithDetails(rental,end,endFuel)){double fuelSurcharge=dao.getRentalFuelSurcharge(rental);dao.logActivity(username,role,"VEHICLE_RETURNED","Rental "+rental+" · end odo "+end+" · fuel "+endFuel+"% · fuel surcharge "+MONEY.format(fuelSurcharge));toast("Vehicle return processed",true);refreshAll();new ReceiptDialog(this,"Return receipt",receipt("Vehicle",model,"Rental ID",String.valueOf(rental),"End odometer",end+" km","End fuel",endFuel+"%","Fuel surcharge",MONEY.format(fuelSurcharge),"Status","Completed"),0,true).setVisible(true);}else toast("Return failed: "+dao.getLastError(),false);}
+
+    private void dispatchRoadsideFuel(){int row=activeTable.getSelectedRow();if(row<0){toast("Select an active rental first",false);return;}int m=activeTable.convertRowIndexToModel(row);int rental=((Number)activeTable.getModel().getValueAt(m,0)).intValue();String model=String.valueOf(activeTable.getModel().getValueAt(m,1));JTextField location=new JTextField(),liters=new JTextField(),cost=new JTextField();JPanel form=dialogForm(new String[]{"Roadside location","Fuel supplied (liters)","Fuel + callout fee"},new JComponent[]{location,liters,cost});if(JOptionPane.showConfirmDialog(this,form,"Dispatch roadside fuel · "+model,JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;try{String place=location.getText().trim();double amount=Double.parseDouble(liters.getText().trim()),fee=Double.parseDouble(cost.getText().trim());if(place.isEmpty()||amount<=0||fee<0)throw new IllegalArgumentException();if(dao.dispatchRoadsideFuel(rental,fee)){String detail="Rental "+rental+" · "+amount+" L · "+place+" · "+MONEY.format(fee);dao.logActivity(username,role,"ROADSIDE_FUEL_DISPATCH",detail);toast("Roadside fuel dispatched · lease updated",true);refreshAll();}else toast("Dispatch failed: "+dao.getLastError(),false);}catch(Exception ex){toast("Enter a location, positive liters, and valid fee",false);}}
+
+    private void refuelVehicle(){int id=selectedId(inventoryTable);if(id<0)return;int row=inventoryTable.convertRowIndexToModel(inventoryTable.getSelectedRow());String status=String.valueOf(inventoryTable.getModel().getValueAt(row,4));if(!"Low Fuel".equalsIgnoreCase(status)){toast("Select a Low Fuel vehicle to refuel",false);return;}if(dao.refuelVehicleToFull(id)){dao.logActivity(username,role,"VEHICLE_REFUELED","Vehicle "+id+" refueled to 100%");toast("Vehicle refueled · available",true);refreshAll();}else toast("Refuel failed: "+dao.getLastError(),false);}
+    private void refreshAll(){if(inventoryTable!=null){inventoryTable.setModel(dao.getAllVehicles());styleTable(inventoryTable);inventorySorter=new TableRowSorter<>((DefaultTableModel)inventoryTable.getModel());inventoryTable.setRowSorter(inventorySorter);}if(availableTable!=null){availableTable.setModel(dao.getAvailableVehicles());styleTable(availableTable);}if(activeTable!=null){activeTable.setModel(dao.getActiveRentals());styleTable(activeTable);}if(customerTable!=null)customerTable.setModel(dao.getAllCustomers());if(historyTable!=null)historyTable.setModel(new DefaultTableModel(new String[]{"Rental ID","Vehicle","Days","Total","Late Fee","Status","Date"},0));refreshAudit();if(fleetKpi!=null){fleetKpi.setText(String.valueOf(dao.getTotalFleetCount()));availableKpi.setText(String.valueOf(dao.getAvailableCount()));leasesKpi.setText(String.valueOf(dao.getActiveRentalCount()));revenueKpi.setText(MONEY.format(dao.calculateTotalRevenue()));}}
+    private void refreshAudit(){if(auditTable!=null){auditTable.setModel(dao.getRecentLogs());styleTable(auditTable);}}
+    public void showView(String v){for(String view:VIEWS)if(view.equals(v)){activeView=v;if(pageTitle!=null)pageTitle.setText(v);if(viewHost!=null){cards.show(viewHost,v);viewHost.revalidate();viewHost.repaint();}return;}}
+    private void installShortcuts(){getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("F5"),"refresh");getRootPane().getActionMap().put("refresh",new AbstractAction(){public void actionPerformed(ActionEvent e){refreshAll();}});getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("control F"),"search");getRootPane().getActionMap().put("search",new AbstractAction(){public void actionPerformed(ActionEvent e){showView(VIEWS[0]);if(searchField!=null)searchField.requestFocusInWindow();}});}
+    private JPanel page(){JPanel p=new JPanel(new BorderLayout(0,14));p.setOpaque(false);return p;}
+    private JPanel toolbar(){JPanel p=new JPanel(new FlowLayout(FlowLayout.LEFT,8,0));p.setOpaque(false);return p;}
+    private ModernComponents.RoundedPanel card(){ModernComponents.RoundedPanel p=new ModernComponents.RoundedPanel(15,Color.WHITE);p.setBorder(new EmptyBorder(18,18,18,18));return p;}
+    private JPanel tableCard(JComponent inner){ModernComponents.RoundedPanel p=card();p.setLayout(new BorderLayout());JScrollPane sc=inner instanceof JTable?new JScrollPane(inner):null;if(sc!=null){sc.setBorder(BorderFactory.createEmptyBorder());sc.getViewport().setBackground(Color.WHITE);p.add(sc);}else p.add(inner);return p;}
+    private JTable table(DefaultTableModel model){JTable t=new JTable(model);styleTable(t);return t;}
+    private void styleTable(JTable t){ModernComponents.StyledTableSetup.apply(t);t.setRowHeight(44);t.setFillsViewportHeight(true);if(t.getParent() instanceof JViewport)t.getParent().setBackground(Color.WHITE);for(int i=0;i<t.getColumnCount();i++){String h=t.getColumnName(i);if(h.equalsIgnoreCase("status")||h.equalsIgnoreCase("role"))t.getColumnModel().getColumn(i).setCellRenderer(new ModernComponents.StatusBadgeRenderer());}}
+    private JButton button(String text,Color c){return new ModernComponents.ModernButton(text,c,Color.WHITE);}
+    private boolean isAdmin(){return "ADMIN".equals(role);}
+    private int selectedId(JTable t){if(t==null||t.getSelectedRow()<0){toast("Select a vehicle first",false);return -1;}int r=t.convertRowIndexToModel(t.getSelectedRow());return ((Number)t.getModel().getValueAt(r,0)).intValue();}
+    private void toast(String s,boolean ok){ModernComponents.ToastNotification.show(this,s,ok);}
+    private GridBagConstraints gc(){GridBagConstraints c=new GridBagConstraints();c.insets=new Insets(7,8,7,8);c.fill=GridBagConstraints.HORIZONTAL;c.weightx=1;c.gridx=0;return c;}
+    private void addLabel(JPanel p,GridBagConstraints c,int y,String s){c.gridy=y;p.add(new JLabel(s),c);}private void addAt(JPanel p,GridBagConstraints c,JComponent x,int y){c.gridy=y;x.setPreferredSize(new Dimension(280,38));p.add(x,c);}
+    private JPanel dialogForm(String[] labels,JComponent[] fields){JPanel p=new JPanel(new GridLayout(labels.length,2,12,12));p.setBorder(new EmptyBorder(16,16,16,16));p.setBackground(CozyTheme.WARM_CREAM);for(int i=0;i<labels.length;i++){p.add(new JLabel(labels[i]));fields[i].setPreferredSize(new Dimension(220,34));p.add(fields[i]);}return p;}
+    private static double discount(String promo,double subtotal){if("FLEET10".equalsIgnoreCase(promo.trim()))return subtotal*.10;if("CORP15".equalsIgnoreCase(promo.trim()))return subtotal*.15;return 0;}
+    private static LinkedHashMap<String,String> receipt(String... vals){LinkedHashMap<String,String> m=new LinkedHashMap<>();for(int i=0;i+1<vals.length;i+=2)m.put(vals[i],vals[i+1]);return m;}
+    private static class CustomerChoice{int id;String name;CustomerChoice(int i,String n){id=i;name=n;}public String toString(){return name+" · #"+id;}}
+    private static class VehicleChoice{int id,odo;String model;double rate;VehicleChoice(int i,String m,double r,int o){id=i;model=m;rate=r;odo=o;}public String toString(){return model+" · "+MONEY.format(rate)+"/day";}}
+    private static class BrandMark extends JComponent{BrandMark(){setPreferredSize(new Dimension(40,40));}protected void paintComponent(Graphics g){Graphics2D x=(Graphics2D)g.create();x.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);x.setColor(CozyTheme.SAGE_GREEN);x.fillRoundRect(0,0,40,40,13,13);x.setColor(Color.WHITE);x.setStroke(new BasicStroke(2.5f));x.drawRoundRect(9,12,22,15,5,5);x.drawLine(13,12,17,7);x.drawLine(27,12,23,7);x.fillOval(12,25,6,6);x.fillOval(23,25,6,6);x.dispose();}}
+    private static class NavButton extends JButton{private boolean selected;private final String icon;NavButton(String i,String s){super(s);icon=i;setHorizontalAlignment(LEFT);setForeground(new Color(211,220,213));setFont(new Font("Segoe UI",Font.BOLD,13));setBorder(new EmptyBorder(13,14,13,12));setContentAreaFilled(false);setFocusPainted(false);setBorderPainted(false);setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));addActionListener(e->{Container p=getParent();for(Component c:p.getComponents())if(c instanceof NavButton)((NavButton)c).setActive(false);setActive(true);});}void setActive(boolean b){selected=b;repaint();}protected void paintComponent(Graphics g){Graphics2D x=(Graphics2D)g.create();x.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);if(selected||getModel().isRollover()){x.setColor(new Color(255,255,255,selected?24:12));x.fillRoundRect(0,0,getWidth(),getHeight(),12,12);}if(selected){x.setColor(CozyTheme.SAGE_GREEN);x.fillRoundRect(0,7,4,getHeight()-14,4,4);}x.setFont(new Font("Segoe UI",Font.BOLD,16));x.setColor(selected?Color.WHITE:new Color(180,193,183));x.drawString(icon,14,(getHeight()+16)/2-2);x.setColor(selected?Color.WHITE:new Color(211,220,213));x.setFont(getFont());x.drawString(getText(),43,(getHeight()+x.getFontMetrics().getAscent()-x.getFontMetrics().getDescent())/2);x.dispose();}}
+    private static class ChartPanel extends JPanel{Map<String,Double> data;ChartPanel(Map<String,Double>d){data=d;setBackground(Color.WHITE);setPreferredSize(new Dimension(420,400));}protected void paintComponent(Graphics g){super.paintComponent(g);Graphics2D x=(Graphics2D)g.create();x.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);x.setFont(new Font("Segoe UI",Font.BOLD,17));x.setColor(CozyTheme.DARK_SLATE);x.drawString("Completed revenue by category",20,30);double max=1;for(double v:data.values())max=Math.max(max,v);int i=0;for(Map.Entry<String,Double> e:data.entrySet()){int y=66+i++*54;int width=(int)((getWidth()-180)*e.getValue()/max);x.setColor(CozyTheme.SEC_PANEL);x.fillRoundRect(20,y,getWidth()-150,24,12,12);x.setColor(CozyTheme.SAGE_GREEN);x.fillRoundRect(20,y,Math.max(8,width),24,12,12);x.setColor(CozyTheme.DARK_SLATE);x.setFont(new Font("Segoe UI",Font.PLAIN,12));x.drawString(e.getKey(),20,y-7);x.drawString(MONEY.format(e.getValue()),Math.min(getWidth()-100,30+width),y+17);}if(data.isEmpty()){x.drawString("Complete a rental to see revenue",22,100);}x.dispose();}}
+    private static class DonutPanel extends JPanel{int total,available,rented,maintenance;DonutPanel(int t,int a,int r){total=t;available=a;rented=r;maintenance=Math.max(0,t-a-r);setBackground(Color.WHITE);setPreferredSize(new Dimension(420,400));}protected void paintComponent(Graphics g){super.paintComponent(g);Graphics2D x=(Graphics2D)g.create();x.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);x.setFont(new Font("Segoe UI",Font.BOLD,17));x.setColor(CozyTheme.DARK_SLATE);x.drawString("Fleet utilization",20,30);int d=200,xx=(getWidth()-d)/2,yy=75;int[] vals={available,rented,maintenance};Color[] cols={new Color(46,125,50),CozyTheme.TERRACOTTA,new Color(214,164,74)};double angle=0;for(int i=0;i<3;i++){double extent=total==0?0:360.0*vals[i]/total;x.setColor(cols[i]);x.fillArc(xx,yy,d,d,(int)Math.round(angle),(int)Math.ceil(extent));angle+=extent;}x.setColor(Color.WHITE);x.fillOval(xx+48,yy+48,d-96,d-96);x.setColor(CozyTheme.DARK_SLATE);x.setFont(new Font("Segoe UI",Font.BOLD,24));String n=""+total;x.drawString(n,xx+d/2-x.getFontMetrics().stringWidth(n)/2,yy+d/2+8);x.setFont(new Font("Segoe UI",Font.PLAIN,12));String[] names={"Available  "+available,"Rented  "+rented,"Maintenance  "+maintenance};for(int i=0;i<3;i++){int lx=36+i*132;x.setColor(cols[i]);x.fillOval(lx,310,10,10);x.setColor(CozyTheme.DARK_SLATE);x.drawString(names[i],lx+15,320);}x.dispose();}}
+    public static void main(String[] args){SwingUtilities.invokeLater(()->{try{UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());}catch(Exception ignored){}LoginDialog d=new LoginDialog(null);d.setVisible(true);if(d.loggedInUser!=null)new MainAppFrame(d.loggedInUser,d.loggedInRole).setVisible(true);});}
 }
